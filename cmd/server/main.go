@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"go-project/internal/repository"
+	"go-project/internal/service"
 	"log"
 	"net/http"
 
@@ -12,20 +13,13 @@ import (
 
 func main() {
 	// подключение к БД
-	dsn := "host=localhost port=5433 user=user password=1234 dbname=dynamica_db sslmode=disable"
-
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open("postgres", "host=localhost port=5433 user=user password=1234 dbname=dynamica_db sslmode=disable")
 	if err != nil {
-		log.Fatal("Ошибка подключения к БД:", err)
+		log.Fatal(err)
 	}
-	defer db.Close()
-
-	if err := db.Ping(); err != nil {
-		log.Fatal("База недоступна:", err)
-	}
-	log.Println("Успешно подключились к базе данных!")
 
 	repo := repository.NewPostgresRepository(db)
+	svc := service.NewDownloaderService(repo)
 
 	// возврат данных
 	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
@@ -50,8 +44,9 @@ func main() {
 			http.Error(w, "Only POST allowed", http.StatusMethodNotAllowed)
 			return
 		}
+		_ = svc.StartDownload()
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status": "Загрузка запущена"}`)) // заглушка
+		w.Write([]byte(`{"status": "Загрузка запущена"}`))
 	})
 
 	log.Println("Сервер запущен на порту :8080...")
