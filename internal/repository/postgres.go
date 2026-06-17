@@ -13,6 +13,31 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
+func (r *PostgresRepository) CreateTask() (int, error) {
+	var id int
+	err := r.db.QueryRow(`
+		INSERT INTO tasks (status, started_at) 
+		VALUES ('в работе', NOW()) 
+		RETURNING id`).Scan(&id)
+	return id, err
+}
+
+func (r *PostgresRepository) CompleteTask(id int) error {
+	_, err := r.db.Exec(`
+		UPDATE tasks 
+		SET status = 'завершено', ended_at = NOW() 
+		WHERE id = $1`, id)
+	return err
+}
+
+func (r *PostgresRepository) CancelRunningTasks() error {
+	_, err := r.db.Exec(`
+		UPDATE tasks 
+		SET status = 'завершено', ended_at = NOW() 
+		WHERE status = 'в работе'`)
+	return err
+}
+
 func (r *PostgresRepository) SaveClients(clients []model.ExtClient) error {
 	for _, c := range clients {
 		_, err := r.db.Exec(`

@@ -7,13 +7,19 @@ import (
 	"go-project/internal/service"
 	"log"
 	"net/http"
+	"os"
 
 	_ "github.com/lib/pq"
 )
 
 func main() {
+	dsn := os.Getenv("DB_DSN")
+	if dsn == "" {
+		// если запуск локальный
+		dsn = "host=localhost port=5433 user=user password=1234 dbname=dynamica_db sslmode=disable"
+	}
 	// подключение к БД
-	db, err := sql.Open("postgres", "host=localhost port=5433 user=user password=1234 dbname=dynamica_db sslmode=disable")
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}

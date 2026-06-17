@@ -14,7 +14,9 @@ import (
 )
 
 type DownloaderService struct {
-	repo *repository.PostgresRepository
+	repo       *repository.PostgresRepository
+	cancelFunc context.CancelFunc
+	mu         sync.Mutex
 }
 
 func NewDownloaderService(repo *repository.PostgresRepository) *DownloaderService {
@@ -22,7 +24,28 @@ func NewDownloaderService(repo *repository.PostgresRepository) *DownloaderServic
 }
 
 func (s *DownloaderService) StartDownload() error {
-	go func() {
+	s.mu.Lock()
+
+	if s.cancelFunc != nil {
+		log.Println("Останавливаем предыдущую активную задачу...")
+		s.cancelFunc()
+	}
+
+	// создаем новый контекст с возможностью отмены
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancelFunc = cancel
+	s.mu.Unlock()
+
+	// завершаем таски в БД перед стартом
+	_ = s.repo.CancelRunningTasks()
+
+	taskID, err := s.repo.CreateTask()
+	if err != nil {
+		log.Printf("Не удалось создать таск в БД: %v", err)
+		return err
+	}
+
+	go func(taskCtx context.Context, tID int) {
 		prodURLs := []string{
 			"https://api.dynamica.space/sources/source1.php",
 			"https://api.dynamica.space/sources/source2.php",
@@ -36,12 +59,13 @@ func (s *DownloaderService) StartDownload() error {
 		var allProducts []model.ExtProduct
 		var allClients []model.ExtClient
 
+		// для продуктов
 		for _, url := range prodURLs {
 			wg.Add(1)
 			go func(u string) {
 				defer wg.Done()
 				var temp []model.ExtProduct
-				req, _ := http.NewRequestWithContext(context.Background(), "GET", u, nil)
+				req, _ := http.NewRequestWithContext(taskCtx, "GET", u, nil)
 				if resp, err := client.Do(req); err == nil {
 					defer resp.Body.Close()
 					if err := json.NewDecoder(resp.Body).Decode(&temp); err == nil {
@@ -49,15 +73,18 @@ func (s *DownloaderService) StartDownload() error {
 						allProducts = append(allProducts, temp...)
 						mu.Unlock()
 					}
+				} else {
+					log.Printf("Ошибка при загрузке данных с %s: %v", u, err)
 				}
 			}(url)
 		}
 
+		// для клиентов
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			var temp []model.ExtClient
-			req, _ := http.NewRequestWithContext(context.Background(), "GET", clientURL, nil)
+			req, _ := http.NewRequestWithContext(taskCtx, "GET", clientURL, nil)
 			if resp, err := client.Do(req); err == nil {
 				defer resp.Body.Close()
 				if err := json.NewDecoder(resp.Body).Decode(&temp); err == nil {
@@ -69,6 +96,12 @@ func (s *DownloaderService) StartDownload() error {
 		}()
 
 		wg.Wait()
+
+		// выходим, если прерван новым POST запросом
+		if taskCtx.Err() != nil {
+			log.Printf("Задача №%d была прервана новой задачей. Выходим.", tID)
+			return
+		}
 
 		log.Printf("Скачано продуктов: %d, клиентов: %d", len(allProducts), len(allClients))
 
@@ -88,8 +121,9 @@ func (s *DownloaderService) StartDownload() error {
 			return
 		}
 
+		_ = s.repo.CompleteTask(tID)
 		log.Println("Данные успешно обновлены и сохранены в БД!")
-	}()
+	}(ctx, taskID)
 
 	return nil
 }
