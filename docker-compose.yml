@@ -9,7 +9,9 @@ services:
     ports:
       - "5433:5432"
     volumes:
+      - pgdata:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
 
   app:
     build: .
@@ -20,6 +22,7 @@ services:
       - DB_DSN=host=db port=5432 user=user password=1234 dbname=dynamica_db sslmode=disable
     depends_on:
       - db
+    restart: unless-stopped
 
 volumes:
   pgdata:

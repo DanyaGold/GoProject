@@ -18,6 +18,7 @@ func main() {
 		// если запуск локальный
 		dsn = "host=localhost port=5433 user=user password=1234 dbname=dynamica_db sslmode=disable"
 	}
+
 	// подключение к БД
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

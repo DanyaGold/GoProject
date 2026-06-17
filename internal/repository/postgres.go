@@ -13,6 +13,7 @@ func NewPostgresRepository(db *sql.DB) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
 
+// регистрация новой задачи
 func (r *PostgresRepository) CreateTask() (int, error) {
 	var id int
 	err := r.db.QueryRow(`
@@ -22,6 +23,7 @@ func (r *PostgresRepository) CreateTask() (int, error) {
 	return id, err
 }
 
+// завершение задачи
 func (r *PostgresRepository) CompleteTask(id int) error {
 	_, err := r.db.Exec(`
 		UPDATE tasks 
@@ -30,6 +32,7 @@ func (r *PostgresRepository) CompleteTask(id int) error {
 	return err
 }
 
+// завершение всех задач перед запуском
 func (r *PostgresRepository) CancelRunningTasks() error {
 	_, err := r.db.Exec(`
 		UPDATE tasks 
@@ -38,6 +41,7 @@ func (r *PostgresRepository) CancelRunningTasks() error {
 	return err
 }
 
+// сохранение клиентов
 func (r *PostgresRepository) SaveClients(clients []model.ExtClient) error {
 	for _, c := range clients {
 		_, err := r.db.Exec(`
@@ -59,6 +63,7 @@ func (r *PostgresRepository) SaveClients(clients []model.ExtClient) error {
 	return nil
 }
 
+// сохранение продуктов
 func (r *PostgresRepository) SaveProducts(products []model.ExtProduct) error {
 	for _, p := range products {
 		var brandID, categoryID int
@@ -96,6 +101,7 @@ func (r *PostgresRepository) SaveProducts(products []model.ExtProduct) error {
 	return nil
 }
 
+// возвращение данных
 func (r *PostgresRepository) GetStats() (map[string]int, error) {
 	var products, clients, brands, categories int
 	_ = r.db.QueryRow("SELECT COUNT(*) FROM products").Scan(&products)

@@ -109,13 +109,13 @@ func (s *DownloaderService) StartDownload() error {
 			allProducts[i].Price = s.cleanPrice(p.Price)
 		}
 
-		// Сохраняем продукты в базу
+		// Сохраняем продукты в бд
 		if err := s.repo.SaveProducts(allProducts); err != nil {
 			log.Printf("Ошибка сохранения продуктов: %v", err)
 			return
 		}
 
-		// Сохраняем клиентов в базу
+		// Сохраняем клиентов в бд
 		if err := s.repo.SaveClients(allClients); err != nil {
 			log.Printf("Ошибка сохранения клиентов: %v", err)
 			return
